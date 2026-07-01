@@ -10,7 +10,13 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import CONF_API_BASE_URL, CONF_REGION, DEFAULT_REGION, DOMAIN
+from .const import (
+    CONF_API_BASE_URL,
+    CONF_REGION,
+    DEFAULT_API_BASE_URL,
+    DEFAULT_REGION,
+    DOMAIN,
+)
 
 
 class UniviewCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -38,7 +44,7 @@ class UniviewCloudConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_USERNAME): str,
                 vol.Required(CONF_PASSWORD): str,
                 vol.Optional(CONF_REGION, default=DEFAULT_REGION): str,
-                vol.Optional(CONF_API_BASE_URL): str,
+                vol.Optional(CONF_API_BASE_URL, default=DEFAULT_API_BASE_URL): str,
             }
         )
         return self.async_show_form(

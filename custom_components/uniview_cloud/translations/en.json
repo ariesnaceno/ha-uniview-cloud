@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Connect to Uniview Cloud",
-        "description": "Enter your Uniview app account details. The API base URL is temporary until the official endpoint is confirmed.",
+        "description": "Enter your Uniview EZCloud account details.",
         "data": {
           "username": "Username",
           "password": "Password",
