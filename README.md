@@ -37,7 +37,7 @@ The default API host is `https://en.ezcloud.uniview.com`, which matches tested U
 
 Existing `0.1.0` entries that were created with `https://ezcloud.uniview.com` are migrated to the UniEase overseas host on restart.
 
-Authentication errors are marked as non-retryable so Home Assistant does not keep retrying a locked or invalid account.
+Authentication errors are marked as non-retryable during initial setup and refresh so Home Assistant does not keep retrying a locked or invalid account.
 
 Do not commit real Uniview credentials, tokens, packet captures, or account-specific device identifiers.
 

@@ -63,9 +63,15 @@ async def async_setup_entry(
         api_base_url=entry.data.get(CONF_API_BASE_URL),
     )
 
+    try:
+        await client.async_login()
+    except UniviewCloudAuthError as err:
+        raise ConfigEntryAuthFailed(str(err)) from err
+    except UniviewCloudError as err:
+        raise UpdateFailed(str(err)) from err
+
     async def async_update_data() -> dict:
         try:
-            await client.async_login()
             return await client.async_get_devices()
         except UniviewCloudAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
