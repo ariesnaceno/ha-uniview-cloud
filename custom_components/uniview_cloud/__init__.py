@@ -8,10 +8,11 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .client import UniviewCloudClient, UniviewCloudError
+from .client import UniviewCloudAuthError, UniviewCloudClient, UniviewCloudError
 from .const import (
     CONF_API_BASE_URL,
     CONF_REGION,
@@ -66,6 +67,8 @@ async def async_setup_entry(
         try:
             await client.async_login()
             return await client.async_get_devices()
+        except UniviewCloudAuthError as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
         except UniviewCloudError as err:
             raise UpdateFailed(str(err)) from err
 
