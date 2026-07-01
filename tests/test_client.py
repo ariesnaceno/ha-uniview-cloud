@@ -84,3 +84,9 @@ def test_hash_password_matches_ezcloud_web_algorithm() -> None:
         UniviewCloudClient._hash_password("test123")
         == "35cc16b1c17a46c71c40f8c89ca892d8"
     )
+
+
+def test_invalid_parameter_error_detection() -> None:
+    """Detect retryable UniEase parameter-shape errors."""
+    assert UniviewCloudClient._is_invalid_parameter_error(Exception("Invalid parameter."))
+    assert not UniviewCloudClient._is_invalid_parameter_error(Exception("User locked"))

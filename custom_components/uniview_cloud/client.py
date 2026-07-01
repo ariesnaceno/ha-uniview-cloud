@@ -12,6 +12,13 @@ from aiohttp import ClientError, ClientSession
 
 from .const import DEFAULT_API_BASE_URL
 
+_DEVICE_LIST_PAYLOADS: tuple[dict[str, Any], ...] = (
+    {"pageNo": 1, "pageSize": 200},
+    {"pageNum": 1, "pageSize": 200},
+    {"page": 1, "pageSize": 200},
+    {},
+)
+
 
 class UniviewCloudError(Exception):
     """Base Uniview Cloud error."""
@@ -89,10 +96,7 @@ class UniviewCloudClient:
         if not self._access_token:
             await self.async_login()
 
-        payload = await self._async_post(
-            "/openapi/device/list",
-            {"pageNo": 1, "pageSize": 200},
-        )
+        payload = await self._async_post_device_list()
         devices_payload = self._extract_list(payload)
         devices: dict[str, UniviewDevice] = {}
         for item in devices_payload:
@@ -166,11 +170,31 @@ class UniviewCloudClient:
             or f"Uniview Cloud request failed with code {code}"
         )
 
+    async def _async_post_device_list(self) -> Any:
+        """Fetch the device list with the request shapes seen across UniEase hosts."""
+        last_error: UniviewCloudError | None = None
+        for data in _DEVICE_LIST_PAYLOADS:
+            try:
+                return await self._async_post("/openapi/device/list", data)
+            except UniviewCloudError as err:
+                if not self._is_invalid_parameter_error(err):
+                    raise
+                last_error = err
+
+        raise UniviewCloudError(
+            f"Device list request rejected by UniEase: {last_error}"
+        ) from last_error
+
     @staticmethod
     def _hash_password(password: str) -> str:
         """Return the password hash used by the EZCloud web portal."""
         first = hashlib.md5(password.encode("utf-8")).hexdigest()
         return hashlib.md5((first + first[:8]).encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _is_invalid_parameter_error(err: Exception) -> bool:
+        """Return true when UniEase rejects only the request parameter shape."""
+        return "invalid parameter" in str(err).lower()
 
     @staticmethod
     def _extract_list(payload: Any) -> list[dict[str, Any]]:
