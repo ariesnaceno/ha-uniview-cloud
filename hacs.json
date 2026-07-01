@@ -1,0 +1,6 @@
+{
+  "name": "Uniview Cloud",
+  "render_readme": true,
+  "domains": ["camera", "binary_sensor", "sensor"],
+  "homeassistant": "2025.1.0"
+}
