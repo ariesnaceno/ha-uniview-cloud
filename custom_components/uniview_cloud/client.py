@@ -95,6 +95,8 @@ class UniviewCloudClient:
         if not token:
             raise UniviewCloudError("Uniview Cloud login response did not include a token")
         self._access_token = str(token)
+        if server_address := payload.get("serverAddress"):
+            self._api_base_url = self._normalize_api_base_url(str(server_address))
 
     async def async_get_devices(self) -> dict[str, UniviewDevice]:
         """Return devices visible to the Uniview account."""
@@ -107,6 +109,10 @@ class UniviewCloudClient:
         for item in devices_payload:
             device = self._parse_device(item)
             devices[device.identifier] = device
+            if item.get("supportMultiChannel"):
+                for channel in await self._async_get_channels(item):
+                    channel_device = self._parse_channel(item, channel)
+                    devices[channel_device.identifier] = channel_device
         return devices
 
     async def async_get_bytes(self, url: str) -> bytes | None:
@@ -195,11 +201,38 @@ class UniviewCloudClient:
             f"Device list request rejected by UniEase: {last_error}"
         ) from last_error
 
+    async def _async_get_channels(self, device: dict[str, Any]) -> list[dict[str, Any]]:
+        """Fetch channel records for a multi-channel device."""
+        device_serial = device.get("deviceSerial") or device.get("serial") or device.get("sn")
+        if not device_serial:
+            return []
+
+        try:
+            payload = await self._async_post(
+                "/openapi/inner/device/channel/list",
+                {
+                    "deviceSerial": device_serial,
+                    "pageNo": 1,
+                    "pageSize": 64,
+                },
+            )
+        except UniviewCloudError:
+            return []
+        return self._extract_list(payload)
+
     @staticmethod
     def _hash_password(password: str) -> str:
         """Return the password hash used by the EZCloud web portal."""
         first = hashlib.md5(password.encode("utf-8")).hexdigest()
         return hashlib.md5((first + first[:8]).encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _normalize_api_base_url(server_address: str) -> str:
+        """Return a complete HTTPS API URL for a login server address."""
+        server_address = server_address.rstrip("/")
+        if server_address.startswith(("http://", "https://")):
+            return server_address
+        return f"https://{server_address}"
 
     @staticmethod
     def _is_invalid_parameter_error(err: Exception) -> bool:
@@ -219,6 +252,7 @@ class UniviewCloudClient:
             "records",
             "devices",
             "deviceList",
+            "channelList",
             "shareableDeviceList",
         ):
             value = payload.get(key)
@@ -255,6 +289,36 @@ class UniviewCloudClient:
             stream_url=item.get("stream_url") or item.get("rtsp_url"),
             snapshot_url=item.get("snapshot_url"),
             raw=item,
+        )
+
+    def _parse_channel(
+        self,
+        parent: dict[str, Any],
+        item: dict[str, Any],
+    ) -> UniviewDevice:
+        parent_serial = str(
+            parent.get("deviceSerial")
+            or parent.get("serial")
+            or parent.get("sn")
+            or parent.get("deviceSn")
+        )
+        channel_no = item.get("channelNo") or item.get("channel_id") or item.get("id")
+        identifier = str(
+            item.get("channelSn")
+            or f"{parent_serial}_{channel_no}"
+        )
+        parent_name = parent.get("deviceName") or parent.get("name") or parent_serial
+        channel_name = item.get("channelName") or item.get("name") or f"Channel {channel_no}"
+
+        return UniviewDevice(
+            identifier=identifier,
+            name=f"{parent_name} {channel_name}",
+            online=self._parse_online(item),
+            model=item.get("channelType") or "Camera Channel",
+            serial_number=item.get("channelSn") or parent_serial,
+            stream_url=item.get("stream_url") or item.get("rtsp_url"),
+            snapshot_url=item.get("snapshot_url"),
+            raw={**item, "parentDevice": parent},
         )
 
     @staticmethod

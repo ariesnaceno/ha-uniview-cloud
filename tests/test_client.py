@@ -96,6 +96,34 @@ def test_parse_device_cdn_shape() -> None:
     assert device.serial_number == "SN456"
 
 
+def test_parse_channel_shape() -> None:
+    """Parse a channel returned by an NVR."""
+    client = UniviewCloudClient(
+        session=None,
+        username="user",
+        password="pass",
+        region="global",
+        api_base_url="https://example.test",
+    )
+
+    device = client._parse_channel(
+        {"deviceSerial": "NVR123", "deviceName": "Moon Home"},
+        {
+            "channelNo": 1,
+            "channelSn": "NVR123_1",
+            "channelName": "Front Door",
+            "channelType": 0,
+            "status": 1,
+        },
+    )
+
+    assert device.identifier == "NVR123_1"
+    assert device.name == "Moon Home Front Door"
+    assert device.online is True
+    assert device.model == "Camera Channel"
+    assert device.serial_number == "NVR123_1"
+
+
 def test_extract_list_common_shapes() -> None:
     """Extract device lists from common API response shapes."""
     assert UniviewCloudClient._extract_list([{"id": "1"}]) == [{"id": "1"}]
@@ -106,6 +134,9 @@ def test_extract_list_common_shapes() -> None:
     assert UniviewCloudClient._extract_list({"shareableDeviceList": [{"id": "4"}]}) == [
         {"id": "4"}
     ]
+    assert UniviewCloudClient._extract_list({"channelList": [{"id": "5"}]}) == [
+        {"id": "5"}
+    ]
 
 
 def test_hash_password_matches_ezcloud_web_algorithm() -> None:
@@ -113,6 +144,18 @@ def test_hash_password_matches_ezcloud_web_algorithm() -> None:
     assert (
         UniviewCloudClient._hash_password("test123")
         == "35cc16b1c17a46c71c40f8c89ca892d8"
+    )
+
+
+def test_normalize_api_base_url_from_login_server_address() -> None:
+    """Normalize the account-specific server address returned by login."""
+    assert (
+        UniviewCloudClient._normalize_api_base_url("ap.ezcloud.uniview.com")
+        == "https://ap.ezcloud.uniview.com"
+    )
+    assert (
+        UniviewCloudClient._normalize_api_base_url("https://ap.ezcloud.uniview.com")
+        == "https://ap.ezcloud.uniview.com"
     )
 
 
