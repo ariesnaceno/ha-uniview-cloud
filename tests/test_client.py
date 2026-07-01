@@ -1,7 +1,29 @@
 """Tests for the Uniview Cloud client."""
 
-from custom_components.uniview_cloud.client import UniviewCloudClient
-from custom_components.uniview_cloud.const import DEFAULT_API_BASE_URL
+from importlib import util
+from pathlib import Path
+import sys
+
+COMPONENT_DIR = Path(__file__).parents[1] / "custom_components" / "uniview_cloud"
+
+const_spec = util.spec_from_file_location(
+    "custom_components.uniview_cloud.const",
+    COMPONENT_DIR / "const.py",
+)
+const_module = util.module_from_spec(const_spec)
+sys.modules[const_spec.name] = const_module
+const_spec.loader.exec_module(const_module)
+
+client_spec = util.spec_from_file_location(
+    "custom_components.uniview_cloud.client",
+    COMPONENT_DIR / "client.py",
+)
+client_module = util.module_from_spec(client_spec)
+sys.modules[client_spec.name] = client_module
+client_spec.loader.exec_module(client_module)
+
+DEFAULT_API_BASE_URL = const_module.DEFAULT_API_BASE_URL
+UniviewCloudClient = client_module.UniviewCloudClient
 
 
 def test_default_api_base_url_targets_uniease_overseas_host() -> None:
