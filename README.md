@@ -2,7 +2,7 @@
 
 Custom Home Assistant integration for Uniview cloud/app accounts.
 
-This project is an early scaffold. The Home Assistant side is structured for HACS, and the client targets the public EZCloud web API surface observed from the Uniview web portal. Real account/device testing is still in progress.
+This project is an early scaffold. The Home Assistant side is structured for HACS, and the client targets the public UniEase/EZCloud web API surface observed from the Uniview web portal.
 
 ## Current scope
 
@@ -32,6 +32,8 @@ The initial client targets these EZCloud routes:
 - `POST /openapi/inner/device/channel/list`
 - `POST /openapi/device/media/url/get`
 - `POST /openapi/device/capture/get`
+
+The default API host is `https://en.ezcloud.uniview.com`, which matches tested UniEase credentials. Other Uniview-branded accounts may need a different API base URL in the setup form.
 
 Do not commit real Uniview credentials, tokens, packet captures, or account-specific device identifiers.
 

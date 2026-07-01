@@ -1,6 +1,19 @@
 """Tests for the Uniview Cloud client."""
 
 from custom_components.uniview_cloud.client import UniviewCloudClient
+from custom_components.uniview_cloud.const import DEFAULT_API_BASE_URL
+
+
+def test_default_api_base_url_targets_uniease_overseas_host() -> None:
+    """Use the host verified for UniEase accounts."""
+    client = UniviewCloudClient(
+        session=None,
+        username="user",
+        password="pass",
+    )
+
+    assert client._api_base_url == DEFAULT_API_BASE_URL
+    assert client._api_base_url == "https://en.ezcloud.uniview.com"
 
 
 def test_parse_device_minimal() -> None:
