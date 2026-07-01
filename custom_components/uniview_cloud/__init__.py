@@ -15,6 +15,7 @@ from .client import UniviewCloudClient, UniviewCloudError
 from .const import (
     CONF_API_BASE_URL,
     CONF_REGION,
+    DEFAULT_API_BASE_URL,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     PLATFORMS,
@@ -33,6 +34,18 @@ class UniviewCloudData:
     ) -> None:
         self.client = client
         self.coordinator = coordinator
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate old Uniview Cloud config entries."""
+    if entry.data.get(CONF_API_BASE_URL) == "https://ezcloud.uniview.com":
+        data = dict(entry.data)
+        data[CONF_API_BASE_URL] = DEFAULT_API_BASE_URL
+        hass.config_entries.async_update_entry(entry, data=data)
+        _LOGGER.info(
+            "Migrated Uniview Cloud API host from EZCloud China to UniEase overseas"
+        )
+    return True
 
 
 async def async_setup_entry(

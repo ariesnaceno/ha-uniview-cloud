@@ -35,6 +35,8 @@ The initial client targets these EZCloud routes:
 
 The default API host is `https://en.ezcloud.uniview.com`, which matches tested UniEase credentials. Other Uniview-branded accounts may need a different API base URL in the setup form.
 
+Existing `0.1.0` entries that were created with `https://ezcloud.uniview.com` are migrated to the UniEase overseas host on restart.
+
 Do not commit real Uniview credentials, tokens, packet captures, or account-specific device identifiers.
 
 ## Repository layout
