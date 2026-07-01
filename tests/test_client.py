@@ -69,12 +69,42 @@ def test_parse_device_ezcloud_shape() -> None:
     assert device.serial_number == "SN123"
 
 
+def test_parse_device_cdn_shape() -> None:
+    """Parse the CDN device list shape used by some UniEase accounts."""
+    client = UniviewCloudClient(
+        session=None,
+        username="user",
+        password="pass",
+        region="global",
+        api_base_url="https://example.test",
+    )
+
+    device = client._parse_device(
+        {
+            "deviceSerial": "SN456",
+            "deviceName": "Driveway",
+            "deviceType": "IPC",
+            "enable": True,
+            "status": 1,
+        }
+    )
+
+    assert device.identifier == "SN456"
+    assert device.name == "Driveway"
+    assert device.online is True
+    assert device.model == "IPC"
+    assert device.serial_number == "SN456"
+
+
 def test_extract_list_common_shapes() -> None:
     """Extract device lists from common API response shapes."""
     assert UniviewCloudClient._extract_list([{"id": "1"}]) == [{"id": "1"}]
     assert UniviewCloudClient._extract_list({"list": [{"id": "2"}]}) == [{"id": "2"}]
     assert UniviewCloudClient._extract_list({"page": {"records": [{"id": "3"}]}}) == [
         {"id": "3"}
+    ]
+    assert UniviewCloudClient._extract_list({"shareableDeviceList": [{"id": "4"}]}) == [
+        {"id": "4"}
     ]
 
 

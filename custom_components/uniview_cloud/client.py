@@ -19,6 +19,11 @@ _DEVICE_LIST_PAYLOADS: tuple[dict[str, Any], ...] = (
     {},
 )
 
+_DEVICE_LIST_PATHS: tuple[str, ...] = (
+    "/openapi/device/list",
+    "/openapi/cdn/device/list",
+)
+
 
 class UniviewCloudError(Exception):
     """Base Uniview Cloud error."""
@@ -173,13 +178,18 @@ class UniviewCloudClient:
     async def _async_post_device_list(self) -> Any:
         """Fetch the device list with the request shapes seen across UniEase hosts."""
         last_error: UniviewCloudError | None = None
-        for data in _DEVICE_LIST_PAYLOADS:
-            try:
-                return await self._async_post("/openapi/device/list", data)
-            except UniviewCloudError as err:
-                if not self._is_invalid_parameter_error(err):
-                    raise
-                last_error = err
+        for path in _DEVICE_LIST_PATHS:
+            for data in _DEVICE_LIST_PAYLOADS:
+                try:
+                    payload = await self._async_post(path, data)
+                except UniviewCloudError as err:
+                    if not self._is_invalid_parameter_error(err):
+                        raise
+                    last_error = err
+                    continue
+
+                if self._extract_list(payload) or path == _DEVICE_LIST_PATHS[-1]:
+                    return payload
 
         raise UniviewCloudError(
             f"Device list request rejected by UniEase: {last_error}"
@@ -203,7 +213,14 @@ class UniviewCloudClient:
             return payload
         if not isinstance(payload, dict):
             return []
-        for key in ("list", "rows", "records", "devices", "deviceList"):
+        for key in (
+            "list",
+            "rows",
+            "records",
+            "devices",
+            "deviceList",
+            "shareableDeviceList",
+        ):
             value = payload.get(key)
             if isinstance(value, list):
                 return value
@@ -247,5 +264,7 @@ class UniviewCloudClient:
                 return bool(item[key])
         status = item.get("status") or item.get("deviceStatus") or item.get("netStatus")
         if isinstance(status, str):
-            return status.lower() in {"online", "1", "true"}
+            return status.lower() in {"online", "1", "true", "enable", "enabled"}
+        if status is None and "enable" in item:
+            return bool(item["enable"])
         return status == 1
