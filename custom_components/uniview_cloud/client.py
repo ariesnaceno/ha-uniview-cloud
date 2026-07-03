@@ -110,8 +110,11 @@ class UniviewCloudClient:
             device = self._parse_device(item)
             devices[device.identifier] = device
             if item.get("supportMultiChannel"):
+                live_urls = await self._async_get_live_urls_by_channel(item)
                 for channel in await self._async_get_channels(item):
-                    channel_device = self._parse_channel(item, channel)
+                    channel_no = self._parse_channel_no(channel)
+                    stream_url = live_urls.get(channel_no)
+                    channel_device = self._parse_channel(item, channel, stream_url)
                     devices[channel_device.identifier] = channel_device
         return devices
 
@@ -220,6 +223,30 @@ class UniviewCloudClient:
             return []
         return self._extract_list(payload)
 
+    async def _async_get_live_urls_by_channel(
+        self,
+        device: dict[str, Any],
+    ) -> dict[int, str]:
+        """Fetch HLS CDN live URLs keyed by channel number."""
+        device_serial = device.get("deviceSerial") or device.get("serial") or device.get("sn")
+        if not device_serial:
+            return {}
+
+        try:
+            payload = await self._async_post(
+                "/openapi/live/video/device/url/list",
+                {
+                    "deviceSerial": device_serial,
+                    "pageStart": 0,
+                    "pageSize": 200,
+                    "quality": 1,
+                    "protocol": 2,
+                },
+            )
+        except UniviewCloudError:
+            return {}
+        return self._live_url_by_channel(payload)
+
     @staticmethod
     def _hash_password(password: str) -> str:
         """Return the password hash used by the EZCloud web portal."""
@@ -253,6 +280,7 @@ class UniviewCloudClient:
             "devices",
             "deviceList",
             "channelList",
+            "liveUrlList",
             "shareableDeviceList",
         ):
             value = payload.get(key)
@@ -295,6 +323,7 @@ class UniviewCloudClient:
         self,
         parent: dict[str, Any],
         item: dict[str, Any],
+        stream_url: str | None = None,
     ) -> UniviewDevice:
         parent_serial = str(
             parent.get("deviceSerial")
@@ -302,7 +331,7 @@ class UniviewCloudClient:
             or parent.get("sn")
             or parent.get("deviceSn")
         )
-        channel_no = item.get("channelNo") or item.get("channel_id") or item.get("id")
+        channel_no = self._parse_channel_no(item)
         identifier = str(
             item.get("channelSn")
             or f"{parent_serial}_{channel_no}"
@@ -316,10 +345,36 @@ class UniviewCloudClient:
             online=self._parse_online(item),
             model=item.get("channelType") or "Camera Channel",
             serial_number=item.get("channelSn") or parent_serial,
-            stream_url=item.get("stream_url") or item.get("rtsp_url"),
+            stream_url=stream_url or item.get("stream_url") or item.get("rtsp_url"),
             snapshot_url=item.get("snapshot_url"),
             raw={**item, "parentDevice": parent},
         )
+
+    @staticmethod
+    def _live_url_by_channel(payload: Any) -> dict[int, str]:
+        """Return live stream URLs keyed by channel number."""
+        urls: dict[int, str] = {}
+        for item in UniviewCloudClient._extract_list(payload):
+            channel_no = UniviewCloudClient._parse_channel_no(item)
+            url = item.get("url")
+            if channel_no is not None and url:
+                urls[channel_no] = str(url)
+        return urls
+
+    @staticmethod
+    def _parse_channel_no(item: dict[str, Any]) -> int | None:
+        """Parse a channel number from a channel or live URL payload."""
+        channel_no = None
+        for key in ("channelNo", "channel_no", "channel", "channel_id", "id"):
+            if key in item and item[key] is not None:
+                channel_no = item[key]
+                break
+        if channel_no is None:
+            return None
+        try:
+            return int(channel_no)
+        except (TypeError, ValueError):
+            return None
 
     @staticmethod
     def _parse_online(item: dict[str, Any]) -> bool:

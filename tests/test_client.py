@@ -146,6 +146,26 @@ def test_parse_channel_shape() -> None:
     assert device.serial_number == "NVR123_1"
 
 
+def test_parse_channel_shape_with_stream_url() -> None:
+    """Attach a CDN HLS URL to a channel camera."""
+    client = UniviewCloudClient(
+        session=None,
+        username="user",
+        password="pass",
+        region="global",
+        api_base_url="https://example.test",
+    )
+
+    device = client._parse_channel(
+        {"deviceSerial": "NVR123", "deviceName": "Moon Home"},
+        {"channelNo": "2", "channelName": "Kitchen", "status": 1},
+        "https://example.test/live/channel-2.m3u8",
+    )
+
+    assert device.identifier == "NVR123_2"
+    assert device.stream_url == "https://example.test/live/channel-2.m3u8"
+
+
 def test_extract_list_common_shapes() -> None:
     """Extract device lists from common API response shapes."""
     assert UniviewCloudClient._extract_list([{"id": "1"}]) == [{"id": "1"}]
@@ -159,6 +179,26 @@ def test_extract_list_common_shapes() -> None:
     assert UniviewCloudClient._extract_list({"channelList": [{"id": "5"}]}) == [
         {"id": "5"}
     ]
+    assert UniviewCloudClient._extract_list({"liveUrlList": [{"id": "6"}]}) == [
+        {"id": "6"}
+    ]
+
+
+def test_live_url_by_channel() -> None:
+    """Extract live stream URLs by channel number."""
+    assert UniviewCloudClient._live_url_by_channel(
+        {
+            "liveUrlList": [
+                {"channelNo": 1, "url": "https://example.test/one.m3u8"},
+                {"channelNo": "2", "url": "https://example.test/two.m3u8"},
+                {"channelNo": None, "url": "https://example.test/missing.m3u8"},
+                {"channelNo": 3},
+            ]
+        }
+    ) == {
+        1: "https://example.test/one.m3u8",
+        2: "https://example.test/two.m3u8",
+    }
 
 
 def test_hash_password_matches_ezcloud_web_algorithm() -> None:
