@@ -110,16 +110,56 @@ class UniviewCloudClient:
             stream_url = None
             if not item.get("supportMultiChannel"):
                 stream_url = await self._async_get_live_url(item)
-            device = self._parse_device(item, stream_url)
+            snapshot_url = await self._async_get_snapshot_url(item) if stream_url else None
+            device = self._parse_device(item, stream_url, snapshot_url)
             devices[device.identifier] = device
             if item.get("supportMultiChannel"):
                 live_urls = await self._async_get_live_urls_by_channel(item)
                 for channel in await self._async_get_channels(item):
                     channel_no = self._parse_channel_no(channel)
                     stream_url = live_urls.get(channel_no)
-                    channel_device = self._parse_channel(item, channel, stream_url)
+                    snapshot_url = (
+                        await self._async_get_snapshot_url(item, channel_no)
+                        if stream_url
+                        else None
+                    )
+                    channel_device = self._parse_channel(
+                        item,
+                        channel,
+                        stream_url,
+                        snapshot_url,
+                    )
                     devices[channel_device.identifier] = channel_device
         return devices
+
+    async def async_get_stream_url(self, device: UniviewDevice) -> str | None:
+        """Fetch a fresh HLS stream URL for a camera entity."""
+        if not device.raw:
+            return device.stream_url
+
+        parent = device.raw.get("parentDevice")
+        if isinstance(parent, dict):
+            channel_no = self._parse_channel_no(device.raw)
+            live_urls = await self._async_get_live_urls_by_channel(parent)
+            stream_url = live_urls.get(channel_no)
+            return stream_url or device.stream_url
+
+        stream_url = await self._async_get_live_url(device.raw)
+        return stream_url or device.stream_url
+
+    async def async_get_snapshot_url(self, device: UniviewDevice) -> str | None:
+        """Fetch a fresh still-image URL for a camera entity."""
+        if not device.raw:
+            return device.snapshot_url
+
+        parent = device.raw.get("parentDevice")
+        if isinstance(parent, dict):
+            channel_no = self._parse_channel_no(device.raw)
+            snapshot_url = await self._async_get_snapshot_url(parent, channel_no)
+            return snapshot_url or device.snapshot_url
+
+        snapshot_url = await self._async_get_snapshot_url(device.raw)
+        return snapshot_url or device.snapshot_url
 
     async def async_get_bytes(self, url: str) -> bytes | None:
         """Fetch binary content."""
@@ -271,6 +311,26 @@ class UniviewCloudClient:
             return None
         return self._first_live_url(payload)
 
+    async def _async_get_snapshot_url(
+        self,
+        device: dict[str, Any],
+        channel_no: int | None = None,
+    ) -> str | None:
+        """Fetch a Uniview still-image URL for a device or channel."""
+        device_serial = device.get("deviceSerial") or device.get("serial") or device.get("sn")
+        if not device_serial:
+            return None
+
+        data: dict[str, Any] = {"deviceSerial": device_serial}
+        if channel_no is not None:
+            data["channelNo"] = channel_no
+
+        try:
+            payload = await self._async_post("/openapi/device/capture/get", data)
+        except UniviewCloudError:
+            return None
+        return self._snapshot_url(payload)
+
     @staticmethod
     def _hash_password(password: str) -> str:
         """Return the password hash used by the EZCloud web portal."""
@@ -319,6 +379,7 @@ class UniviewCloudClient:
         self,
         item: dict[str, Any],
         stream_url: str | None = None,
+        snapshot_url: str | None = None,
     ) -> UniviewDevice:
         identifier = str(
             item.get("id")
@@ -343,7 +404,7 @@ class UniviewCloudClient:
             model=item.get("model") or item.get("deviceModel") or item.get("deviceType"),
             serial_number=item.get("deviceSerial") or item.get("serial") or item.get("sn"),
             stream_url=stream_url or item.get("stream_url") or item.get("rtsp_url"),
-            snapshot_url=item.get("snapshot_url"),
+            snapshot_url=snapshot_url or item.get("snapshot_url"),
             raw=item,
         )
 
@@ -352,6 +413,7 @@ class UniviewCloudClient:
         parent: dict[str, Any],
         item: dict[str, Any],
         stream_url: str | None = None,
+        snapshot_url: str | None = None,
     ) -> UniviewDevice:
         parent_serial = str(
             parent.get("deviceSerial")
@@ -374,7 +436,7 @@ class UniviewCloudClient:
             model=item.get("channelType") or "Camera Channel",
             serial_number=item.get("channelSn") or parent_serial,
             stream_url=stream_url or item.get("stream_url") or item.get("rtsp_url"),
-            snapshot_url=item.get("snapshot_url"),
+            snapshot_url=snapshot_url or item.get("snapshot_url"),
             raw={**item, "parentDevice": parent},
         )
 
@@ -394,6 +456,16 @@ class UniviewCloudClient:
         """Return the first live stream URL from a UniEase live URL payload."""
         for item in UniviewCloudClient._extract_list(payload):
             if url := item.get("url"):
+                return str(url)
+        return None
+
+    @staticmethod
+    def _snapshot_url(payload: Any) -> str | None:
+        """Return a still-image URL from a UniEase capture payload."""
+        if not isinstance(payload, dict):
+            return None
+        for key in ("url", "imageUrl", "captureUrl", "picUrl", "snapshotUrl"):
+            if url := payload.get(key):
                 return str(url)
         return None
 

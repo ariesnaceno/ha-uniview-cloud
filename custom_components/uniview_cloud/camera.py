@@ -36,7 +36,9 @@ class UniviewCloudCamera(UniviewCloudEntity, Camera):
 
     async def stream_source(self) -> str | None:
         """Return the stream source."""
-        return self.uniview_device.stream_url
+        return await self._entry.runtime_data.client.async_get_stream_url(
+            self.uniview_device
+        )
 
     async def async_camera_image(
         self,
@@ -44,7 +46,9 @@ class UniviewCloudCamera(UniviewCloudEntity, Camera):
         height: int | None = None,
     ) -> bytes | None:
         """Return a still image response from the device if available."""
-        snapshot_url = self.uniview_device.snapshot_url
+        snapshot_url = await self._entry.runtime_data.client.async_get_snapshot_url(
+            self.uniview_device
+        )
         if not snapshot_url:
             return None
 
