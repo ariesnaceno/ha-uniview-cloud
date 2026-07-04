@@ -110,7 +110,7 @@ class UniviewCloudClient:
             stream_url = None
             if not item.get("supportMultiChannel"):
                 stream_url = await self._async_get_live_url(item)
-            snapshot_url = await self._async_get_snapshot_url(item) if stream_url else None
+            snapshot_url = await self._async_get_snapshot_url(item)
             device = self._parse_device(item, stream_url, snapshot_url)
             devices[device.identifier] = device
             if item.get("supportMultiChannel"):
@@ -118,11 +118,7 @@ class UniviewCloudClient:
                 for channel in await self._async_get_channels(item):
                     channel_no = self._parse_channel_no(channel)
                     stream_url = live_urls.get(channel_no)
-                    snapshot_url = (
-                        await self._async_get_snapshot_url(item, channel_no)
-                        if stream_url
-                        else None
-                    )
+                    snapshot_url = await self._async_get_snapshot_url(item, channel_no)
                     channel_device = self._parse_channel(
                         item,
                         channel,
@@ -164,12 +160,19 @@ class UniviewCloudClient:
     async def async_get_bytes(self, url: str) -> bytes | None:
         """Fetch binary content."""
         try:
-            response = await self._session.get(url)
+            response = await self._session.get(
+                url,
+                headers={
+                    "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                    "User-Agent": "Home Assistant Uniview Cloud",
+                },
+            )
         except ClientError:
             return None
-        if response.status >= 400:
-            return None
-        return await response.read()
+        async with response:
+            if response.status >= 400:
+                return None
+            return await response.read()
 
     async def _async_post(
         self,

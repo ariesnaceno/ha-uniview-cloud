@@ -236,6 +236,26 @@ def test_parse_channel_shape_with_snapshot_url() -> None:
     assert device.raw["parentDevice"]["deviceSerial"] == "NVR123"
 
 
+def test_parse_channel_shape_with_snapshot_url_without_stream_url() -> None:
+    """Allow channel cameras to be exposed when only a preview is available."""
+    client = UniviewCloudClient(
+        session=None,
+        username="user",
+        password="pass",
+        region="global",
+        api_base_url="https://example.test",
+    )
+
+    device = client._parse_channel(
+        {"deviceSerial": "NVR123", "deviceName": "Moon Home"},
+        {"channelNo": "2", "channelName": "Kitchen", "status": 1},
+        snapshot_url="https://example.test/capture/channel-2.jpg",
+    )
+
+    assert device.stream_url is None
+    assert device.snapshot_url == "https://example.test/capture/channel-2.jpg"
+
+
 def test_extract_list_common_shapes() -> None:
     """Extract device lists from common API response shapes."""
     assert UniviewCloudClient._extract_list([{"id": "1"}]) == [{"id": "1"}]

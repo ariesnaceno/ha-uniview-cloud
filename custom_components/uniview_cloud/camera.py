@@ -19,7 +19,7 @@ async def async_setup_entry(
     async_add_entities(
         UniviewCloudCamera(entry, device_id)
         for device_id, device in entry.runtime_data.coordinator.data.items()
-        if device.stream_url
+        if device.stream_url or device.snapshot_url
     )
 
 
@@ -27,12 +27,19 @@ class UniviewCloudCamera(UniviewCloudEntity, Camera):
     """Representation of a Uniview Cloud camera."""
 
     _attr_name = None
-    _attr_supported_features = CameraEntityFeature.STREAM
 
     @property
     def available(self) -> bool:
-        """Return whether the camera has a playable stream URL."""
-        return super().available and bool(self.uniview_device.stream_url)
+        """Return whether the camera has a playable stream or preview image."""
+        device = self.uniview_device
+        return super().available and bool(device.stream_url or device.snapshot_url)
+
+    @property
+    def supported_features(self) -> CameraEntityFeature:
+        """Return supported camera features."""
+        if self.uniview_device.stream_url:
+            return CameraEntityFeature.STREAM
+        return CameraEntityFeature(0)
 
     async def stream_source(self) -> str | None:
         """Return the stream source."""
