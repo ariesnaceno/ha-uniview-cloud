@@ -107,7 +107,10 @@ class UniviewCloudClient:
         devices_payload = self._extract_list(payload)
         devices: dict[str, UniviewDevice] = {}
         for item in devices_payload:
-            device = self._parse_device(item)
+            stream_url = None
+            if not item.get("supportMultiChannel"):
+                stream_url = await self._async_get_live_url(item)
+            device = self._parse_device(item, stream_url)
             devices[device.identifier] = device
             if item.get("supportMultiChannel"):
                 live_urls = await self._async_get_live_urls_by_channel(item)
@@ -247,6 +250,27 @@ class UniviewCloudClient:
             return {}
         return self._live_url_by_channel(payload)
 
+    async def _async_get_live_url(self, device: dict[str, Any]) -> str | None:
+        """Fetch the preferred HLS CDN live URL for a single-channel device."""
+        device_serial = device.get("deviceSerial") or device.get("serial") or device.get("sn")
+        if not device_serial:
+            return None
+
+        try:
+            payload = await self._async_post(
+                "/openapi/live/video/device/url/list",
+                {
+                    "deviceSerial": device_serial,
+                    "pageStart": 0,
+                    "pageSize": 20,
+                    "quality": 1,
+                    "protocol": 2,
+                },
+            )
+        except UniviewCloudError:
+            return None
+        return self._first_live_url(payload)
+
     @staticmethod
     def _hash_password(password: str) -> str:
         """Return the password hash used by the EZCloud web portal."""
@@ -291,7 +315,11 @@ class UniviewCloudClient:
             return UniviewCloudClient._extract_list(page)
         return []
 
-    def _parse_device(self, item: dict[str, Any]) -> UniviewDevice:
+    def _parse_device(
+        self,
+        item: dict[str, Any],
+        stream_url: str | None = None,
+    ) -> UniviewDevice:
         identifier = str(
             item.get("id")
             or item.get("deviceId")
@@ -314,7 +342,7 @@ class UniviewCloudClient:
             online=self._parse_online(item),
             model=item.get("model") or item.get("deviceModel") or item.get("deviceType"),
             serial_number=item.get("deviceSerial") or item.get("serial") or item.get("sn"),
-            stream_url=item.get("stream_url") or item.get("rtsp_url"),
+            stream_url=stream_url or item.get("stream_url") or item.get("rtsp_url"),
             snapshot_url=item.get("snapshot_url"),
             raw=item,
         )
@@ -360,6 +388,14 @@ class UniviewCloudClient:
             if channel_no is not None and url:
                 urls[channel_no] = str(url)
         return urls
+
+    @staticmethod
+    def _first_live_url(payload: Any) -> str | None:
+        """Return the first live stream URL from a UniEase live URL payload."""
+        for item in UniviewCloudClient._extract_list(payload):
+            if url := item.get("url"):
+                return str(url)
+        return None
 
     @staticmethod
     def _parse_channel_no(item: dict[str, Any]) -> int | None:

@@ -118,6 +118,31 @@ def test_parse_device_cdn_shape() -> None:
     assert device.serial_number == "SN456"
 
 
+def test_parse_device_cdn_shape_with_stream_url() -> None:
+    """Attach a CDN HLS URL to a single-channel camera."""
+    client = UniviewCloudClient(
+        session=None,
+        username="user",
+        password="pass",
+        region="global",
+        api_base_url="https://example.test",
+    )
+
+    device = client._parse_device(
+        {
+            "deviceSerial": "SN789",
+            "deviceName": "DoorBell",
+            "deviceModel": "OEU",
+            "status": 1,
+        },
+        "https://example.test/live/doorbell.m3u8",
+    )
+
+    assert device.identifier == "SN789"
+    assert device.name == "DoorBell"
+    assert device.stream_url == "https://example.test/live/doorbell.m3u8"
+
+
 def test_parse_channel_shape() -> None:
     """Parse a channel returned by an NVR."""
     client = UniviewCloudClient(
@@ -199,6 +224,23 @@ def test_live_url_by_channel() -> None:
         1: "https://example.test/one.m3u8",
         2: "https://example.test/two.m3u8",
     }
+
+
+def test_first_live_url() -> None:
+    """Extract the first live stream URL from a live URL payload."""
+    assert (
+        UniviewCloudClient._first_live_url(
+            {
+                "liveUrlList": [
+                    {"channelNo": 1},
+                    {"channelNo": 2, "url": "https://example.test/two.m3u8"},
+                    {"channelNo": 3, "url": "https://example.test/three.m3u8"},
+                ]
+            }
+        )
+        == "https://example.test/two.m3u8"
+    )
+    assert UniviewCloudClient._first_live_url({"liveUrlList": []}) is None
 
 
 def test_hash_password_matches_ezcloud_web_algorithm() -> None:
